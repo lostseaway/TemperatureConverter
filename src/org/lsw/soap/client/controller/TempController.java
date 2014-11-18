@@ -1,4 +1,4 @@
-package controller;
+package org.lsw.soap.client.controller;
 
 import java.util.ArrayList;
 import java.util.List;

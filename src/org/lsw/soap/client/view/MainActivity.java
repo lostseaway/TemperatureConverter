@@ -1,5 +1,5 @@
 
-package view;
+package org.lsw.soap.client.view;
 
 import java.awt.BorderLayout;
 import java.awt.Container;
@@ -13,8 +13,11 @@ import java.awt.event.KeyListener;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -28,7 +31,11 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingWorker;
 import javax.swing.border.BevelBorder;
 
-import controller.TempController;
+import org.lsw.soap.client.controller.ControllerFactory;
+import org.lsw.soap.client.controller.TempController;
+
+import net.webservicex.TemperatureUnit;
+
 /**
  * Main Activity of Temperature Converter
  * @author Thunyathon Jaruchotrattanasakul 55105469782
@@ -36,7 +43,6 @@ import controller.TempController;
  */
 public class MainActivity extends JFrame implements Runnable {
 
-	private TempController controller;
 	private JLabel urlLabel;
 	private JTextField tempField;
 	private JComboBox fUnitList;
@@ -46,12 +52,15 @@ public class MainActivity extends JFrame implements Runnable {
 	private JButton conB;
 	public MainActivity(){
 		super("Temperature Converter");
-		controller = new TempController();
-		
 		this.initComponets();
 	}
 	private void initComponets() {
-		list = controller.getTempUnit();
+		list = new ArrayList<String>();
+		list.add(TemperatureUnit.DEGREE_CELSIUS.toString());
+		list.add(TemperatureUnit.DEGREE_FAHRENHEIT.toString());
+		list.add(TemperatureUnit.DEGREE_RANKINE.toString());
+		list.add(TemperatureUnit.DEGREE_REAUMUR.toString());
+		list.add(TemperatureUnit.KELVIN.toString());
 		FlowLayout layout = new FlowLayout();
 		Container contain = new Container();
 		contain.setLayout(layout);
@@ -150,6 +159,21 @@ public class MainActivity extends JFrame implements Runnable {
 		this.setDisable();
 		TestConnectionTask check = new TestConnectionTask(this);
 		check.execute();
+		try{
+			check.get(1, TimeUnit.SECONDS);
+		}
+		catch(TimeoutException e){
+			System.out.println("timeout");
+			check.cancel(true);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			check.cancel(true);
+			e.printStackTrace();
+		} catch (ExecutionException e) {
+			// TODO Auto-generated catch block
+			check.cancel(true);
+			e.printStackTrace();
+		}
 		
 	}
 	
@@ -157,9 +181,22 @@ public class MainActivity extends JFrame implements Runnable {
 	 * Calculate the converted value
 	 */
 	public void calculate(){
-		ConnectTask task = new ConnectTask(controller, this);
-		task.addParam(Double.parseDouble(tempField.getText()),fUnitList.getSelectedIndex(), tUnitList.getSelectedIndex());
-		task.execute();
+		ConnectTask task = new ConnectTask(ControllerFactory.getController(), this);
+		
+		try{
+			task.addParam(Double.parseDouble(tempField.getText()),fUnitList.getSelectedIndex(), tUnitList.getSelectedIndex());
+			task.execute();
+			task.get(3,TimeUnit.SECONDS);
+		}
+		catch(TimeoutException e){
+			System.out.println("timeout");
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ExecutionException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 	
 	/**
@@ -220,6 +257,7 @@ class ConnectTask extends SwingWorker<Double , Object>{
 	@Override
 	protected Double doInBackground() throws Exception {
 		main.setStatusBar("Loading Data");
+		
 		return controller.convert(temp, funit, tunit);
 	}
 	@Override
@@ -261,10 +299,23 @@ class TestConnectionTask extends SwingWorker<Boolean , Object>{
 		try {
 			if(!this.get()){
 				main.setEnable();
-				JOptionPane.showMessageDialog(main,
-					    "No Internet Connection\n Please Check Your Connection.",
-					    "NO Connection",
-					    JOptionPane.ERROR_MESSAGE);
+				Object[] options = {"Cancel",
+	                    "Retry"};
+					int n = JOptionPane.showOptionDialog(main,
+						"No Internet Connection\n Please Check Your Connection.",
+						"NO Connection",
+					    JOptionPane.YES_NO_CANCEL_OPTION,
+					    JOptionPane.ERROR_MESSAGE,
+					    null,
+					    options,
+					    options[1]);
+					if(n==0){
+						main.setStatusBar("No Connection!");
+					}
+					if(n==1){
+						TestConnectionTask check = new TestConnectionTask(main);
+						check.execute();
+					}
 			}
 			else{
 				main.setStatusBar("Connected!!");

@@ -1,4 +1,4 @@
-package view;
+package org.lsw.soap.client.view;
 
 import net.webservicex.ConvertTemperature;
 import net.webservicex.ConvertTemperatureSoap;
