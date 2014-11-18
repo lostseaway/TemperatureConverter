@@ -1,4 +1,3 @@
-
 package org.lsw.soap.client.view;
 
 import java.awt.BorderLayout;
@@ -15,6 +14,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -31,15 +31,16 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingWorker;
 import javax.swing.border.BevelBorder;
 
-import org.lsw.soap.client.controller.ControllerFactory;
-import org.lsw.soap.client.controller.TempController;
+import org.lsw.soap.client.controller.*;
+import org.lsw.soap.client.task.*;
 
 import net.webservicex.TemperatureUnit;
 
 /**
  * Main Activity of Temperature Converter
+ * 
  * @author Thunyathon Jaruchotrattanasakul 55105469782
- *
+ * 
  */
 public class MainActivity extends JFrame implements Runnable {
 
@@ -50,10 +51,12 @@ public class MainActivity extends JFrame implements Runnable {
 	private List<String> list;
 	private JLabel statusLabel;
 	private JButton conB;
-	public MainActivity(){
+
+	public MainActivity() {
 		super("Temperature Converter");
 		this.initComponets();
 	}
+
 	private void initComponets() {
 		list = new ArrayList<String>();
 		list.add(TemperatureUnit.DEGREE_CELSIUS.toString());
@@ -67,51 +70,66 @@ public class MainActivity extends JFrame implements Runnable {
 		urlLabel = new JLabel("Temperature");
 		contain.add(urlLabel);
 		tempField = new JTextField(20);
-		tempField.addKeyListener(new KeyListener(){
+		tempField.addKeyListener(new KeyListener() {
 
 			@Override
 			public void keyTyped(KeyEvent e) {
 				// TODO Auto-generated method stub
-				
+
 			}
 
 			@Override
 			public void keyPressed(KeyEvent e) {
-				if(e.getKeyCode()==1)checkError();
-				
+				if (e.getKeyCode() == 1)
+					try {
+						checkError();
+					} catch (InterruptedException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					} catch (ExecutionException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					}
+
 			}
 
 			@Override
 			public void keyReleased(KeyEvent e) {
 				// TODO Auto-generated method stub
-				
+
 			}
-			
+
 		});
 		contain.add(tempField);
-		
 
-		fUnitList = new JComboBox(list.toArray());		
+		fUnitList = new JComboBox(list.toArray());
 		contain.add(fUnitList);
-		
+
 		tUnitList = new JComboBox(list.toArray());
 		tUnitList.setSelectedIndex(1);
 		contain.add(tUnitList);
-		
+
 		conB = new JButton("CONVERT!");
 		contain.add(conB);
-		conB.addActionListener(new ActionListener(){
+		conB.addActionListener(new ActionListener() {
 
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
-				
-				checkError();
-				
+
+				try {
+					checkError();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (ExecutionException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+
 			}
-			
-			
+
 		});
-		
+
 		JPanel statusPanel = new JPanel();
 		statusPanel.setBorder(new BevelBorder(BevelBorder.LOWERED));
 		super.add(statusPanel, BorderLayout.SOUTH);
@@ -121,74 +139,82 @@ public class MainActivity extends JFrame implements Runnable {
 		statusLabel.setHorizontalAlignment(SwingConstants.LEFT);
 		statusPanel.add(statusLabel);
 
-		
 		super.add(contain, BorderLayout.NORTH);
 		this.setDefaultCloseOperation(EXIT_ON_CLOSE);
-		
+
 	}
-	public void setStatusBar(String text){
+
+	public void setStatusBar(String text) {
 		statusLabel.setText(text);
 	}
-	
+
 	/**
 	 * Checking the input is error or not
+	 * 
+	 * @throws ExecutionException
+	 * @throws InterruptedException
 	 */
-	private void checkError(){
+	private void checkError() throws InterruptedException, ExecutionException {
 		double temp;
-		
+
 		try {
-		   temp = Double.parseDouble(tempField.getText());
-		}
-		catch (NumberFormatException e) {
-			
-			JOptionPane.showMessageDialog(this,
-				    "Bad Input",
-				    "Converted!",
-				    JOptionPane.ERROR_MESSAGE);
+			temp = Double.parseDouble(tempField.getText());
+		} catch (NumberFormatException e) {
+
+			JOptionPane.showMessageDialog(this, "Bad Input", "Converted!",
+					JOptionPane.ERROR_MESSAGE);
 			tempField.setText("");
 			return;
 		}
-		
-		if(fUnitList.getSelectedIndex() == tUnitList.getSelectedIndex()){
-			JOptionPane.showMessageDialog(this,
-				    "BAD Unit",
-				    "Converted!",
-				    JOptionPane.ERROR_MESSAGE);
+
+		if (fUnitList.getSelectedIndex() == tUnitList.getSelectedIndex()) {
+			JOptionPane.showMessageDialog(this, "BAD Unit", "Converted!",
+					JOptionPane.ERROR_MESSAGE);
 			return;
 		}
 		this.setDisable();
 		TestConnectionTask check = new TestConnectionTask(this);
 		check.execute();
-		try{
+		try {
 			check.get(1, TimeUnit.SECONDS);
+		} catch (TimeoutException e) {
+			
+			Object[] options = { "Cancel", "Retry" };
+			int n = JOptionPane.showOptionDialog(this,
+					"Connection TimeOut.",
+					"TimeOut!", JOptionPane.YES_NO_CANCEL_OPTION,
+					JOptionPane.ERROR_MESSAGE, null, options, options[1]);
+			if (n == 0) {
+				this.setStatusBar("Connection TimeOut!");
+				this.setEnable();
+			}
+			if (n == 1) {
+				this.checkError();
+			}
+			try {
+				check.cancel(true);
+			} catch (CancellationException e1) {
+//				System.out.println(e1);
+			}
+			return;
 		}
-		catch(TimeoutException e){
-			System.out.println("timeout");
-			check.cancel(true);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			check.cancel(true);
-			e.printStackTrace();
-		} catch (ExecutionException e) {
-			// TODO Auto-generated catch block
-			check.cancel(true);
-			e.printStackTrace();
-		}
-		
+
 	}
-	
+
 	/**
 	 * Calculate the converted value
 	 */
-	public void calculate(){
-		ConnectTask task = new ConnectTask(ControllerFactory.getController(), this);
-		
-		try{
-			task.addParam(Double.parseDouble(tempField.getText()),fUnitList.getSelectedIndex(), tUnitList.getSelectedIndex());
+	public void calculate() {
+
+		ConnectTask task = new ConnectTask(ControllerFactory.getController(),
+				this);
+
+		try {
+			task.addParam(Double.parseDouble(tempField.getText()),
+					fUnitList.getSelectedIndex(), tUnitList.getSelectedIndex());
 			task.execute();
-			task.get(3,TimeUnit.SECONDS);
-		}
-		catch(TimeoutException e){
+			task.get(3, TimeUnit.SECONDS);
+		} catch (TimeoutException e) {
 			System.out.println("timeout");
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
@@ -198,153 +224,34 @@ public class MainActivity extends JFrame implements Runnable {
 			e.printStackTrace();
 		}
 	}
-	
+
 	/**
 	 * Set Component Disable
 	 */
-	public void setDisable(){
+	public void setDisable() {
 		tempField.setEditable(false);
 		tempField.setEnabled(false);
 		fUnitList.setEnabled(false);
 		tUnitList.setEnabled(false);
 		conB.setEnabled(false);
-		
+
 	}
-	
+
 	/**
 	 * Set Component Enable
 	 */
-	public void setEnable(){
+	public void setEnable() {
 		tempField.setEditable(true);
 		tempField.setEnabled(true);
 		fUnitList.setEnabled(true);
 		tUnitList.setEnabled(true);
 		conB.setEnabled(true);
 	}
-	
+
 	@Override
 	public void run() {
 		pack();
-		this.setVisible(true);	
+		this.setVisible(true);
 	}
-	
-	
 
 }
-class ConnectTask extends SwingWorker<Double , Object>{
-
-	private TempController controller;
-	private MainActivity main;
-	private double temp;
-	private int funit;
-	private int tunit;
-	public ConnectTask(TempController con,MainActivity main){
-		this.controller = con;
-		this.main = main;
-	}
-	
-	/**
-	 * Add Parameter for preparing calculation
-	 * @param temp
-	 * @param funit
-	 * @param tunit
-	 */
-	public void addParam(double temp,int funit,int tunit){
-		this.temp = temp;
-		this.funit = funit;
-		this.tunit = tunit;
-	}
-	@Override
-	protected Double doInBackground() throws Exception {
-		main.setStatusBar("Loading Data");
-		
-		return controller.convert(temp, funit, tunit);
-	}
-	@Override
-	protected void done() {
-		try {
-			main.setEnable();
-			main.setStatusBar("Successful!");
-			JOptionPane.showMessageDialog(main,
-				    this.get(),
-				    "Converted!",
-				    JOptionPane.PLAIN_MESSAGE);
-		} catch (HeadlessException e) {
-			// TODO Auto-generated catch block
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ExecutionException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
-}
-
-class TestConnectionTask extends SwingWorker<Boolean , Object>{
-
-	private MainActivity main;
-	public TestConnectionTask(MainActivity main){
-		this.main = main;
-	}
-	@Override
-	protected Boolean doInBackground() throws Exception {
-		main.setStatusBar("Checking Connection!");
-		return this.testInet("www.webservicex.net");
-	}
-	
-	
-	@Override
-	protected void done() {
-		try {
-			if(!this.get()){
-				main.setEnable();
-				Object[] options = {"Cancel",
-	                    "Retry"};
-					int n = JOptionPane.showOptionDialog(main,
-						"No Internet Connection\n Please Check Your Connection.",
-						"NO Connection",
-					    JOptionPane.YES_NO_CANCEL_OPTION,
-					    JOptionPane.ERROR_MESSAGE,
-					    null,
-					    options,
-					    options[1]);
-					if(n==0){
-						main.setStatusBar("No Connection!");
-					}
-					if(n==1){
-						TestConnectionTask check = new TestConnectionTask(main);
-						check.execute();
-					}
-			}
-			else{
-				main.setStatusBar("Connected!!");
-				main.calculate();
-			}
-		} catch (InterruptedException | ExecutionException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-	}
-	
-	/**
-	 * Checking internet Connection
-	 * @param site
-	 * @return
-	 */
-	public boolean testInet(String site) {
-	    Socket sock = new Socket();
-	    InetSocketAddress addr = new InetSocketAddress(site,80);
-	    try {
-	        sock.connect(addr,3000);
-	        return true;
-	    } catch (IOException e) {
-	        return false;
-	    } finally {
-	        try {sock.close();}
-	        catch (IOException e) {}
-	    }
-	}
-}
-
