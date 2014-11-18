@@ -24,7 +24,6 @@ public class TestConnectionTask extends SwingWorker<Boolean , Object>{
 	}
 	@Override
 	protected Boolean doInBackground() throws Exception {
-		main.setStatusBar("Checking Connection!");
 		ControllerFactory.getController();
 		return this.testInet("www.webservicex.net");
 	}

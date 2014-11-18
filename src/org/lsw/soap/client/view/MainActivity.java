@@ -156,7 +156,7 @@ public class MainActivity extends JFrame implements Runnable {
 	 */
 	private void checkError() throws InterruptedException, ExecutionException {
 		double temp;
-
+		this.setStatusBar("Checking Input!");
 		try {
 			temp = Double.parseDouble(tempField.getText());
 		} catch (NumberFormatException e) {
@@ -172,39 +172,24 @@ public class MainActivity extends JFrame implements Runnable {
 					JOptionPane.ERROR_MESSAGE);
 			return;
 		}
+		this.setStatusBar("Checking Connection!");
 		this.setDisable();
 		TestConnectionTask check = new TestConnectionTask(this);
 		check.execute();
 		try {
-			check.get(1, TimeUnit.SECONDS);
+			check.get(10, TimeUnit.SECONDS);
 		} catch (TimeoutException e) {
-			
-			Object[] options = { "Cancel", "Retry" };
-			int n = JOptionPane.showOptionDialog(this,
-					"Connection TimeOut.",
-					"TimeOut!", JOptionPane.YES_NO_CANCEL_OPTION,
-					JOptionPane.ERROR_MESSAGE, null, options, options[1]);
-			if (n == 0) {
-				this.setStatusBar("Connection TimeOut!");
-				this.setEnable();
-			}
-			if (n == 1) {
-				this.checkError();
-			}
-			try {
-				check.cancel(true);
-			} catch (CancellationException e1) {
-//				System.out.println(e1);
-			}
-			return;
+			timeOut(check);
 		}
 
 	}
 
 	/**
 	 * Calculate the converted value
+	 * @throws ExecutionException 
+	 * @throws InterruptedException 
 	 */
-	public void calculate() {
+	public void calculate() throws InterruptedException, ExecutionException {
 
 		ConnectTask task = new ConnectTask(ControllerFactory.getController(),
 				this);
@@ -213,9 +198,9 @@ public class MainActivity extends JFrame implements Runnable {
 			task.addParam(Double.parseDouble(tempField.getText()),
 					fUnitList.getSelectedIndex(), tUnitList.getSelectedIndex());
 			task.execute();
-			task.get(3, TimeUnit.SECONDS);
+			task.get(10, TimeUnit.SECONDS);
 		} catch (TimeoutException e) {
-			System.out.println("timeout");
+			timeOut(task);
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -246,6 +231,33 @@ public class MainActivity extends JFrame implements Runnable {
 		fUnitList.setEnabled(true);
 		tUnitList.setEnabled(true);
 		conB.setEnabled(true);
+	}
+	
+	/**
+	 * Show Dialog when timeout
+	 * @param w
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 */
+	public void timeOut(SwingWorker w) throws InterruptedException, ExecutionException{
+		Object[] options = { "Cancel", "Retry" };
+		int n = JOptionPane.showOptionDialog(this,
+				"Connection TimeOut.",
+				"TimeOut!", JOptionPane.YES_NO_CANCEL_OPTION,
+				JOptionPane.ERROR_MESSAGE, null, options, options[1]);
+		if (n == 0) {
+			this.setStatusBar("Connection TimeOut!");
+			this.setEnable();
+		}
+		if (n == 1) {
+			this.checkError();
+		}
+		try {
+			w.cancel(true);
+		} catch (CancellationException e1) {
+			return;
+		}
+		return;
 	}
 
 	@Override
